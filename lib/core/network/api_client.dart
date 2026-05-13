@@ -58,6 +58,10 @@ class ApiClient {
     return _guard(() => dio.put<T>(path, data: data), 'PUT $path failed');
   }
 
+  Future<Response<T>> patch<T>(String path, {Object? data}) {
+    return _guard(() => dio.patch<T>(path, data: data), 'PATCH $path failed');
+  }
+
   Future<Response<T>> delete<T>(String path) {
     return _guard(() => dio.delete<T>(path), 'DELETE $path failed');
   }

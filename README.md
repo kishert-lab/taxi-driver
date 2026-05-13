@@ -43,10 +43,38 @@ UI widgets do not call HTTP clients directly. Driver line access, order status t
 Pass backend URLs at build/run time:
 
 ```bash
-flutter run --dart-define=API_BASE_URL=https://api.your-domain.com --dart-define=WS_URL=wss://api.your-domain.com/api/v1/driver/ws
+flutter run --dart-define=API_BASE_URL=http://192.168.0.50:8083 --dart-define=WS_URL=ws://192.168.0.50:8083/api/v1/ws
 ```
 
-Default development values point to `https://api.example.com`.
+Default development values point to `http://192.168.0.50:8083` and `ws://192.168.0.50:8083/api/v1/ws`.
+
+Local Swagger was used as the source of truth:
+
+```text
+http://192.168.0.50:8083/swagger/index.html
+```
+
+Implemented client paths now match the backend routes:
+
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/verify-code`
+- `POST /api/v1/auth/refresh`
+- `GET/PATCH /api/v1/driver/profile`
+- `POST /api/v1/driver/online`
+- `POST /api/v1/driver/offline`
+- `POST /api/v1/driver/location`
+- `POST /api/v1/driver/location/batch`
+- `GET /api/v1/driver/orders/current`
+- `GET /api/v1/driver/orders/history`
+- `POST /api/v1/driver/orders/{id}/accept`
+- `POST /api/v1/driver/orders/{id}/reject`
+- `POST /api/v1/driver/orders/{id}/arrived`
+- `POST /api/v1/driver/orders/{id}/start`
+- `POST /api/v1/driver/orders/{id}/complete`
+- `GET /api/v1/driver/balance`
+- `GET /api/v1/driver/transactions`
+
+The current Swagger does not expose a push-token endpoint, so push registration remains isolated in `PushNotificationService` until the backend route is added.
 
 ## Verification
 

@@ -15,11 +15,11 @@ class AppConfig {
     return const AppConfig(
       apiBaseUrl: String.fromEnvironment(
         'API_BASE_URL',
-        defaultValue: 'https://api.example.com',
+        defaultValue: 'http://192.168.0.50:8083/',
       ),
       websocketUrl: String.fromEnvironment(
         'WS_URL',
-        defaultValue: 'wss://api.example.com/api/v1/driver/ws',
+        defaultValue: 'ws://192.168.0.50:8083/api/v1/ws',
       ),
       orderOfferTimeoutSeconds: 20,
       minimumPrepaidBalance: 0,

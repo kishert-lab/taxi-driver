@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'core/config/app_config.dart';
 import 'core/location/location_service.dart';
+import 'core/navigation/external_navigation_service.dart';
 import 'core/network/api_client.dart';
 import 'core/push/push_notification_service.dart';
 import 'core/storage/secure_token_storage.dart';
@@ -13,15 +14,20 @@ import 'features/auth/data/driver_auth_repository.dart';
 import 'features/auth/presentation/bloc/auth_cubit.dart';
 import 'features/auth/presentation/pages/driver_login_page.dart';
 import 'features/balance/application/commission_calculator.dart';
+import 'features/balance/data/driver_balance_repository.dart';
 import 'features/balance/presentation/bloc/balance_cubit.dart';
 import 'features/cars/presentation/bloc/cars_cubit.dart';
 import 'features/documents/presentation/bloc/documents_cubit.dart';
+import 'features/driver_profile/data/driver_profile_repository.dart';
 import 'features/driver_profile/presentation/bloc/driver_profile_cubit.dart';
+import 'features/location/data/driver_location_repository.dart';
 import 'features/map/presentation/pages/driver_home_page.dart';
 import 'features/notifications/presentation/bloc/notifications_cubit.dart';
 import 'features/orders/application/order_state_machine.dart';
+import 'features/orders/data/driver_orders_repository.dart';
 import 'features/orders/presentation/bloc/orders_cubit.dart';
 import 'features/shift/application/driver_access_policy.dart';
+import 'features/shift/data/driver_shift_repository.dart';
 import 'features/shift/presentation/bloc/shift_cubit.dart';
 import 'features/trips_history/presentation/bloc/trips_history_cubit.dart';
 import 'shared/theme/app_theme.dart';
@@ -51,7 +57,13 @@ class TaxiDriverApp extends StatelessWidget {
         RepositoryProvider.value(value: tokenStorage),
         RepositoryProvider.value(value: websocketClient),
         RepositoryProvider.value(value: locationService),
+        RepositoryProvider.value(value: const ExternalNavigationService()),
         RepositoryProvider.value(value: PushNotificationService(apiClient)),
+        RepositoryProvider.value(value: DriverProfileRepository(apiClient)),
+        RepositoryProvider.value(value: DriverShiftRepository(apiClient)),
+        RepositoryProvider.value(value: DriverLocationRepository(apiClient)),
+        RepositoryProvider.value(value: DriverOrdersRepository(apiClient)),
+        RepositoryProvider.value(value: DriverBalanceRepository(apiClient)),
         RepositoryProvider.value(value: accessPolicy),
         RepositoryProvider.value(value: OrderStateMachine()),
         RepositoryProvider.value(value: commissionCalculator),

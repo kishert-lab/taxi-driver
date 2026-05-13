@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/config/app_config.dart';
+import '../../../../core/navigation/external_navigation_service.dart';
 import '../../../../core/utils/money_formatter.dart';
 import '../../../../shared/models/driver_models.dart';
 import '../../../../shared/widgets/driver_section.dart';
@@ -272,6 +273,7 @@ class _ActiveOrderPanel extends StatelessWidget {
                       label: 'Я еду',
                       icon: Icons.route_outlined,
                     ),
+                    _NavigatorButton(order: order),
                     _OrderAction(
                       status: DriverOrderStatus.arrived,
                       label: 'Я на месте',
@@ -297,6 +299,88 @@ class _ActiveOrderPanel extends StatelessWidget {
               ],
             ),
     );
+  }
+}
+
+class _NavigatorButton extends StatelessWidget {
+  const _NavigatorButton({required this.order});
+
+  final ActiveOrder order;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: () => _showNavigatorMenu(context),
+      icon: const Icon(Icons.navigation_outlined),
+      label: const Text('Навигатор'),
+    );
+  }
+
+  Future<void> _showNavigatorMenu(BuildContext context) async {
+    final selectedNavigator = await showModalBottomSheet<ExternalNavigatorApp>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.navigation_outlined),
+              title: const Text('Яндекс Навигатор'),
+              onTap: () => Navigator.of(
+                context,
+              ).pop(ExternalNavigatorApp.yandexNavigator),
+            ),
+            ListTile(
+              leading: const Icon(Icons.map_outlined),
+              title: const Text('2ГИС'),
+              onTap: () =>
+                  Navigator.of(context).pop(ExternalNavigatorApp.twoGis),
+            ),
+            ListTile(
+              leading: const Icon(Icons.assistant_direction_outlined),
+              title: const Text('Google Maps'),
+              onTap: () =>
+                  Navigator.of(context).pop(ExternalNavigatorApp.googleMaps),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!context.mounted || selectedNavigator == null) {
+      return;
+    }
+
+    await _openNavigator(context, selectedNavigator);
+  }
+
+  Future<void> _openNavigator(
+    BuildContext context,
+    ExternalNavigatorApp selectedNavigator,
+  ) async {
+    final navigationService = context.read<ExternalNavigationService>();
+    final address = order.status == DriverOrderStatus.started
+        ? order.destinationAddress ?? order.pickupAddress
+        : order.pickupAddress;
+    final label = order.status == DriverOrderStatus.started
+        ? 'Назначение'
+        : 'Подача';
+
+    try {
+      await navigationService.openRoute(
+        destination: NavigationTarget(label: label, address: address),
+        preferredNavigator: selectedNavigator,
+      );
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось открыть навигатор: $error')),
+      );
+    }
   }
 }
 
