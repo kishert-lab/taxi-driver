@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'app.dart';
-import 'core/config/app_config.dart';
+import 'app/app.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  runApp(TaxiDriverApp(config: AppConfig.development()));
+  runApp(const ProviderScope(child: TaxiDriverApplication()));
 }

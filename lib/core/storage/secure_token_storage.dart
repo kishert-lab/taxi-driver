@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../features/auth/domain/auth_tokens.dart';
@@ -6,21 +7,23 @@ class SecureTokenStorage {
   SecureTokenStorage({FlutterSecureStorage? storage})
     : _storage = storage ?? const FlutterSecureStorage();
 
-  static const _accessTokenKey = 'driver_access_token';
-  static const _refreshTokenKey = 'driver_refresh_token';
+  static const _accessTokenKey = 'taxi_driver_access_token';
+  static const _refreshTokenKey = 'taxi_driver_refresh_token';
 
   final FlutterSecureStorage _storage;
 
   Future<AuthTokens?> readTokens() async {
     final accessToken = await _storage.read(key: _accessTokenKey);
     final refreshToken = await _storage.read(key: _refreshTokenKey);
-
     if (accessToken == null || refreshToken == null) {
       return null;
     }
-
     return AuthTokens(accessToken: accessToken, refreshToken: refreshToken);
   }
+
+  Future<String?> readAccessToken() => _storage.read(key: _accessTokenKey);
+
+  Future<String?> readRefreshToken() => _storage.read(key: _refreshTokenKey);
 
   Future<void> saveTokens(AuthTokens tokens) async {
     await _storage.write(key: _accessTokenKey, value: tokens.accessToken);
@@ -32,3 +35,7 @@ class SecureTokenStorage {
     await _storage.delete(key: _refreshTokenKey);
   }
 }
+
+final secureTokenStorageProvider = Provider<SecureTokenStorage>(
+  (ref) => SecureTokenStorage(),
+);

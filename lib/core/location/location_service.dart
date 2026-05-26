@@ -1,52 +1,90 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart' as permissions;
 
-import '../errors/app_exception.dart';
-import '../../shared/models/driver_models.dart';
+import '../../features/driver/domain/driver_profile.dart';
+import '../../features/orders/domain/driver_order.dart';
+
+class DriverLocationSample {
+  const DriverLocationSample({
+    required this.coordinates,
+    this.heading,
+    this.speedMetersPerSecond,
+    this.accuracyMeters,
+  });
+
+  final Coordinates coordinates;
+  final int? heading;
+  final double? speedMetersPerSecond;
+  final double? accuracyMeters;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'location': coordinates.toJson(),
+      if (heading != null) 'heading': heading,
+      if (speedMetersPerSecond != null) 'speed_mps': speedMetersPerSecond,
+      if (accuracyMeters != null) 'accuracy_meters': accuracyMeters,
+    };
+  }
+}
 
 class LocationService {
   Future<void> ensurePermission() async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      throw const ValidationException('geolocation service is disabled');
+      throw const LocationException('Служба геолокации выключена.');
     }
 
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      throw const ValidationException('geolocation permission is not granted');
+    final permission = await permissions.Permission.locationWhenInUse.request();
+    if (!permission.isGranted) {
+      throw const LocationException('Нет разрешения на геолокацию.');
     }
   }
 
-  Stream<DriverLocation> watchDriverLocation(DriverWorkStatus status) {
-    final interval = switch (status) {
-      DriverWorkStatus.inTrip ||
-      DriverWorkStatus.busy => const Duration(seconds: 3),
-      DriverWorkStatus.online ||
-      DriverWorkStatus.onWayToClient ||
-      DriverWorkStatus.waitingClient => const Duration(seconds: 7),
-      _ => const Duration(seconds: 30),
-    };
+  Future<DriverLocationSample> currentLocation() async {
+    await ensurePermission();
+    final position = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+    );
+    return _map(position);
+  }
 
+  Stream<DriverLocationSample> watch(DriverStatus status) {
+    if (!status.canSendLocation) {
+      return const Stream.empty();
+    }
     return Geolocator.getPositionStream(
-      locationSettings: LocationSettings(
+      locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 10,
-        timeLimit: interval,
       ),
-    ).map(
-      (position) => DriverLocation(
+    ).map(_map);
+  }
+
+  DriverLocationSample _map(Position position) {
+    return DriverLocationSample(
+      coordinates: Coordinates(
         latitude: position.latitude,
         longitude: position.longitude,
-        speed: position.speed,
-        bearing: position.heading,
-        accuracy: position.accuracy,
-        status: status,
-        timestamp: position.timestamp,
       ),
+      heading: position.heading < 0
+          ? null
+          : position.heading.round().clamp(0, 359),
+      speedMetersPerSecond: position.speed < 0 ? null : position.speed,
+      accuracyMeters: position.accuracy < 0 ? null : position.accuracy,
     );
   }
 }
+
+class LocationException implements Exception {
+  const LocationException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+final locationServiceProvider = Provider<LocationService>(
+  (ref) => LocationService(),
+);

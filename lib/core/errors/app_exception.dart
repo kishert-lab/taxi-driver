@@ -25,3 +25,13 @@ class ValidationException extends AppException {
 class NetworkException extends AppException {
   const NetworkException(super.message, {super.cause});
 }
+
+class HttpStatusException extends NetworkException {
+  const HttpStatusException(
+    super.message, {
+    required this.statusCode,
+    super.cause,
+  });
+
+  final int statusCode;
+}

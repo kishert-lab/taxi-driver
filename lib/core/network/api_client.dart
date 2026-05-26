@@ -1,84 +1,114 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_config.dart';
-import '../errors/app_exception.dart';
 import '../storage/secure_token_storage.dart';
+import 'api_error.dart';
+import 'auth_interceptor.dart';
 
 class ApiClient {
   ApiClient({
     required AppConfig config,
     required SecureTokenStorage tokenStorage,
-  }) : _tokenStorage = tokenStorage,
-       dio = Dio(
-         BaseOptions(
-           baseUrl: config.apiBaseUrl,
-           connectTimeout: const Duration(seconds: 15),
-           receiveTimeout: const Duration(seconds: 20),
-           sendTimeout: const Duration(seconds: 20),
-           headers: const {'Accept': 'application/json'},
-         ),
-       ) {
+    required void Function() onSessionExpired,
+  }) {
+    dio = Dio(
+      BaseOptions(
+        baseUrl: config.baseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 20),
+        sendTimeout: const Duration(seconds: 20),
+        headers: const {'Accept': 'application/json'},
+      ),
+    );
     dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) async {
-          final tokens = await _tokenStorage.readTokens();
-          if (tokens != null) {
-            options.headers['Authorization'] = 'Bearer ${tokens.accessToken}';
-          }
-          handler.next(options);
-        },
-        onError: (error, handler) {
-          handler.next(error);
-        },
+      AuthInterceptor(
+        dio: dio,
+        config: config,
+        tokenStorage: tokenStorage,
+        onSessionExpired: onSessionExpired,
       ),
     );
   }
 
-  final Dio dio;
-  final SecureTokenStorage _tokenStorage;
+  late final Dio dio;
 
-  Future<Response<T>> get<T>(
+  Future<T> get<T>(
     String path, {
     Map<String, dynamic>? queryParameters,
+    required T Function(Object? json) parser,
   }) {
     return _guard(
-      () => dio.get<T>(path, queryParameters: queryParameters),
-      'GET $path failed',
+      () =>
+          dio.get<Map<String, dynamic>>(path, queryParameters: queryParameters),
+      parser,
     );
   }
 
-  Future<Response<T>> post<T>(String path, {Object? data, Options? options}) {
+  Future<T> post<T>(
+    String path, {
+    Object? data,
+    required T Function(Object? json) parser,
+    Options? options,
+  }) {
     return _guard(
-      () => dio.post<T>(path, data: data, options: options),
-      'POST $path failed',
+      () => dio.post<Map<String, dynamic>>(path, data: data, options: options),
+      parser,
     );
   }
 
-  Future<Response<T>> put<T>(String path, {Object? data}) {
-    return _guard(() => dio.put<T>(path, data: data), 'PUT $path failed');
+  Future<T> patch<T>(
+    String path, {
+    Object? data,
+    required T Function(Object? json) parser,
+  }) {
+    return _guard(
+      () => dio.patch<Map<String, dynamic>>(path, data: data),
+      parser,
+    );
   }
 
-  Future<Response<T>> patch<T>(String path, {Object? data}) {
-    return _guard(() => dio.patch<T>(path, data: data), 'PATCH $path failed');
-  }
-
-  Future<Response<T>> delete<T>(String path) {
-    return _guard(() => dio.delete<T>(path), 'DELETE $path failed');
-  }
-
-  Future<Response<T>> _guard<T>(
-    Future<Response<T>> Function() request,
-    String context,
+  Future<T> _guard<T>(
+    Future<Response<Map<String, dynamic>>> Function() request,
+    T Function(Object? json) parser,
   ) async {
     try {
-      return await request();
+      final response = await request();
+      return parser(response.data?['data']);
     } on DioException catch (error) {
-      if (error.response?.statusCode == 401) {
-        throw UnauthorizedException(context, cause: error);
-      }
-      throw NetworkException(context, cause: error);
-    } catch (error) {
-      throw AppException(context, cause: error);
+      throw _toApiException(error);
     }
   }
+
+  ApiException _toApiException(DioException error) {
+    final body = error.response?.data;
+    if (body is Map) {
+      final json = Map<String, dynamic>.from(body);
+      final errorBody = json['error'];
+      final meta = json['meta'];
+      return ApiException(
+        statusCode: error.response?.statusCode,
+        code: errorBody is Map ? errorBody['code'] as String? : null,
+        message: errorBody is Map
+            ? errorBody['message'] as String? ?? 'Ошибка сервера'
+            : 'Ошибка сервера',
+        details: errorBody is Map && errorBody['details'] is Map
+            ? Map<String, dynamic>.from(errorBody['details'] as Map)
+            : null,
+        requestId: meta is Map ? meta['request_id'] as String? : null,
+      );
+    }
+    return ApiException(
+      statusCode: error.response?.statusCode,
+      message: error.message ?? 'Ошибка сети',
+    );
+  }
 }
+
+final apiClientProvider = Provider<ApiClient>((ref) {
+  return ApiClient(
+    config: ref.watch(appConfigProvider),
+    tokenStorage: ref.watch(secureTokenStorageProvider),
+    onSessionExpired: () {},
+  );
+});

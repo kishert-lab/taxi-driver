@@ -1,87 +1,85 @@
-# Taxi Driver App
+# Taxi Driver
 
-Flutter MVP scaffold for a separate taxi driver mobile application.
+Production-oriented Flutter application for taxi drivers working with `taxi-platform`.
 
-## Stack
+## Backend
 
-- Flutter
-- BLoC/Cubit
-- Dio
-- Retrofit dependencies for generated API clients
-- Secure Storage
-- WebSocket channel
-- Geolocator
-- Firebase Messaging
+Default configuration is in [lib/core/config/app_config.dart](lib/core/config/app_config.dart):
+
+```text
+BASE_URL=http://192.168.0.50:8080/api/v1
+WS_URL=ws://192.168.0.50:8080/api/v1/ws
+```
+
+Override at build/run time:
+
+```bash
+flutter run \
+  --dart-define=BASE_URL=http://192.168.0.50:8080/api/v1 \
+  --dart-define=WS_URL=ws://192.168.0.50:8080/api/v1/ws
+```
+
+## Features
+
+- Login by phone and password.
+- Secure token storage with `flutter_secure_storage`.
+- Dio API client with Bearer auth, automatic refresh on `401`, and one retry.
+- Typed parsing for backend success/error envelopes.
+- Driver profile, online/offline status, current order, order history, balance and transactions.
+- WebSocket connection after login with reconnect/backoff.
+- WS events: `sync.required`, `order.offer`, offer cancelled/expired, accepted/cancelled.
+- Location permission and high-accuracy tracking while online/busy.
+- Location update throttle: no more than one update per two seconds.
+- `429 RATE_LIMITED` location updates are skipped silently.
+- Russian operational UI with dashboard, orders, balance and profile tabs.
 
 ## Architecture
 
-The app is split by explicit layers:
-
-- `lib/core` - config, network, storage, WebSocket, location, push, errors
-- `lib/features/*/domain` - pure domain entities where a feature needs them
-- `lib/features/*/application` - business rules and use cases
-- `lib/features/*/data` - repositories and backend API access
-- `lib/features/*/presentation` - pages and BLoC/Cubit state
-- `lib/shared` - shared models, theme, and widgets
-
-UI widgets do not call HTTP clients directly. Driver line access, order status transitions, and platform commission calculation are implemented outside presentation code.
-
-## Implemented MVP Scaffold
-
-- Phone auth flow with SMS code endpoints and secure token storage
-- Driver home screen with map placeholder, WebSocket/GPS indicators, shift controls, order offer, active order, readiness, balance
-- Driver readiness policy: verified profile, approved required documents, approved car, GPS permission, balance
-- Strict active order state machine
-- Platform commission calculation at 1%
-- WebSocket client with token-based connection
-- Location service with status-based update frequency
-- Push token registration service
-- Domain tests for shift access, order transitions, and commission
-
-## Backend Configuration
-
-Pass backend URLs at build/run time:
-
-```bash
-flutter run --dart-define=API_BASE_URL=http://192.168.0.50:8083 --dart-define=WS_URL=ws://192.168.0.50:8083/api/v1/ws
+```text
+lib/
+  app/                  app, router, theme
+  core/
+    config/             backend URLs
+    network/            Dio, auth interceptor, API errors
+    storage/            secure token storage
+    ws/                 WebSocket client and message envelope
+    location/           permissions and geolocation
+  features/
+    auth/               login and auth state
+    driver/             profile, status and location controllers
+    orders/             current order, history and order offer UI
+    balance/            balance and transactions
+    profile/            profile screen
 ```
 
-Default development values point to `http://192.168.0.50:8083` and `ws://192.168.0.50:8083/api/v1/ws`.
+State management: Riverpod.
 
-Local Swagger was used as the source of truth:
+All API calls go through repositories. Widgets only render state and dispatch commands.
+
+## Backend Notes
+
+If backend returns `NOT_IMPLEMENTED` or HTTP `501`, the app shows:
 
 ```text
-http://192.168.0.50:8083/swagger/index.html
+Функция пока недоступна на сервере.
 ```
 
-Implemented client paths now match the backend routes:
+For `/driver/online`, `DRIVER_NOT_AVAILABLE` is shown as:
 
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/verify-code`
-- `POST /api/v1/auth/refresh`
-- `GET/PATCH /api/v1/driver/profile`
-- `POST /api/v1/driver/online`
-- `POST /api/v1/driver/offline`
-- `POST /api/v1/driver/location`
-- `POST /api/v1/driver/location/batch`
-- `GET /api/v1/driver/orders/current`
-- `GET /api/v1/driver/orders/history`
-- `POST /api/v1/driver/orders/{id}/accept`
-- `POST /api/v1/driver/orders/{id}/reject`
-- `POST /api/v1/driver/orders/{id}/arrived`
-- `POST /api/v1/driver/orders/{id}/start`
-- `POST /api/v1/driver/orders/{id}/complete`
-- `GET /api/v1/driver/balance`
-- `GET /api/v1/driver/transactions`
+```text
+Вы не можете выйти на линию. Проверьте статус проверки документов и автомобиля.
+```
 
-The current Swagger does not expose a push-token endpoint, so push registration remains isolated in `PushNotificationService` until the backend route is added.
-
-## Verification
+## Run
 
 ```bash
+flutter pub get
 flutter analyze
-flutter build apk --debug
-flutter test
+flutter run
 ```
 
-In this local environment `flutter analyze` and Android debug build pass. `flutter test` currently fails before loading the suite because the Flutter test shell closes its local runner HTTP connection.
+## Test
+
+```bash
+flutter test
+```

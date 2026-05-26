@@ -1,30 +1,14 @@
-import '../errors/app_exception.dart';
+class ApiResponse<T> {
+  const ApiResponse({required this.data, this.requestId});
 
-class ApiResponse {
-  const ApiResponse._();
+  final T data;
+  final String? requestId;
 
-  static Map<String, dynamic> data(Map<String, dynamic>? response) {
-    final payload = response?['data'];
-    if (payload is Map<String, dynamic>) {
-      return payload;
+  static String? requestIdFrom(Map<String, dynamic>? json) {
+    final meta = json?['meta'];
+    if (meta is Map) {
+      return meta['request_id'] as String?;
     }
-
-    if (payload is Map) {
-      return Map<String, dynamic>.from(payload);
-    }
-
-    throw const AppException('backend response does not contain object data');
-  }
-
-  static List<dynamic> listField(
-    Map<String, dynamic>? response,
-    String fieldName,
-  ) {
-    final payload = data(response)[fieldName];
-    if (payload is List) {
-      return payload;
-    }
-
-    return const [];
+    return null;
   }
 }

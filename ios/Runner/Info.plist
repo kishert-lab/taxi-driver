@@ -32,6 +32,8 @@
 		<string>google.navigation</string>
 		<string>geo</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Показываем водителя на карте и отправляем координаты во время смены.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
