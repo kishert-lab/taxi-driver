@@ -24,7 +24,14 @@ class DashboardScreen extends ConsumerWidget {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
-            await ref.read(driverProfileProvider.notifier).load();
+            final profile = await ref
+                .read(driverProfileProvider.notifier)
+                .refresh();
+            if (profile != null) {
+              ref
+                  .read(driverStatusControllerProvider.notifier)
+                  .syncFromProfile(profile);
+            }
           },
           child: ListView(
             padding: const EdgeInsets.all(16),
@@ -112,9 +119,20 @@ class _StatusPanel extends StatelessWidget {
             ),
             if (errorMessage != null) ...[
               const SizedBox(height: 12),
-              Text(
-                errorMessage!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    errorMessage!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                ),
               ),
             ],
             const SizedBox(height: 16),

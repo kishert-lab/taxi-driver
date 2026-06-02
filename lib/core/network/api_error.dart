@@ -14,11 +14,24 @@ class ApiException implements Exception {
   final Map<String, dynamic>? details;
 
   bool get isUnauthorized => statusCode == 401 || code == 'UNAUTHORIZED';
+  bool get isForbidden => statusCode == 403 || code == 'FORBIDDEN';
+  bool get isOrderNotFound => statusCode == 404 || code == 'ORDER_NOT_FOUND';
+  bool get isInternalError => statusCode == 500 || code == 'INTERNAL_ERROR';
   bool get isRateLimited => statusCode == 429 || code == 'RATE_LIMITED';
   bool get isNotImplemented => statusCode == 501 || code == 'NOT_IMPLEMENTED';
   bool get isDriverNotAvailable => code == 'DRIVER_NOT_AVAILABLE';
 
   String get userMessage {
+    if (isForbidden) {
+      return 'Нет доступа';
+    }
+    if (isOrderNotFound) {
+      return 'Заказ не найден';
+    }
+    if (isInternalError) {
+      final suffix = requestId == null ? '' : ' ($requestId)';
+      return 'Ошибка сервера$suffix';
+    }
     if (isNotImplemented) {
       return 'Функция пока недоступна на сервере.';
     }

@@ -7,6 +7,8 @@ import '../../../core/network/api_error.dart';
 import '../data/location_repository.dart';
 import '../domain/driver_profile.dart';
 
+const _locationBatchLimit = 50;
+
 class LocationState {
   const LocationState({
     required this.isTracking,
@@ -37,6 +39,7 @@ class LocationController extends StateNotifier<LocationState> {
   final LocationRepository _repository;
   StreamSubscription<DriverLocationSample>? _subscription;
   DateTime? _lastSentAt;
+  final List<DriverLocationSample> _pendingLocations = [];
 
   Future<void> start(DriverStatus status) async {
     if (!status.canSendLocation) {
@@ -49,6 +52,21 @@ class LocationController extends StateNotifier<LocationState> {
       await _subscription?.cancel();
       state = LocationState(isTracking: true, lastLocation: state.lastLocation);
       _subscription = _service.watch(status).listen(_onLocation);
+    } catch (error) {
+      state = LocationState(
+        isTracking: false,
+        lastLocation: state.lastLocation,
+        errorMessage: '$error',
+      );
+    }
+  }
+
+  Future<void> startTripTracking() async {
+    try {
+      await _service.ensurePermission();
+      await _subscription?.cancel();
+      state = LocationState(isTracking: true, lastLocation: state.lastLocation);
+      _subscription = _service.watchTrip().listen(_onLocation);
     } catch (error) {
       state = LocationState(
         isTracking: false,
@@ -83,6 +101,33 @@ class LocationController extends StateNotifier<LocationState> {
     }
   }
 
+  Future<void> sendLastLocationBeforeComplete() async {
+    final location = await currentLocation();
+    if (location == null) {
+      return;
+    }
+    await _sendOrQueue(location);
+    await flushPendingLocations();
+  }
+
+  Future<void> flushPendingLocations() async {
+    if (_pendingLocations.isEmpty) {
+      return;
+    }
+
+    final batch = _pendingLocations.take(_locationBatchLimit).toList();
+    try {
+      await _repository.sendBatch(batch);
+      _pendingLocations.removeRange(0, batch.length);
+    } on ApiException catch (error) {
+      state = LocationState(
+        isTracking: state.isTracking,
+        lastLocation: state.lastLocation,
+        errorMessage: error.userMessage,
+      );
+    }
+  }
+
   Future<void> _onLocation(DriverLocationSample location) async {
     state = LocationState(isTracking: true, lastLocation: location);
     final now = DateTime.now();
@@ -91,12 +136,22 @@ class LocationController extends StateNotifier<LocationState> {
     }
 
     _lastSentAt = now;
+    await _sendOrQueue(location);
+    await flushPendingLocations();
+  }
+
+  Future<void> _sendOrQueue(DriverLocationSample location) async {
     try {
+      if (_pendingLocations.isNotEmpty) {
+        _pendingLocations.add(location);
+        return;
+      }
       await _repository.send(location);
     } on ApiException catch (error) {
       if (error.isRateLimited) {
         return;
       }
+      _pendingLocations.add(location);
       state = LocationState(
         isTracking: true,
         lastLocation: location,

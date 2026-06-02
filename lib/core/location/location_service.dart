@@ -53,6 +53,10 @@ class LocationService {
     if (!status.canSendLocation) {
       return const Stream.empty();
     }
+    return watchTrip();
+  }
+
+  Stream<DriverLocationSample> watchTrip() {
     return Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,

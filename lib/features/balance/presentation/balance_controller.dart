@@ -41,4 +41,6 @@ class BalanceController extends StateNotifier<Loadable<BalanceViewData>> {
       );
     }
   }
+
+  Future<void> refresh() => load();
 }

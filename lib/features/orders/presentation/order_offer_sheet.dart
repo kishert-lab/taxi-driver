@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../application/driver_order_api_capabilities.dart';
 import '../domain/driver_order.dart';
 import 'orders_controllers.dart';
 
@@ -32,6 +33,7 @@ class _OrderOfferSheet extends ConsumerStatefulWidget {
 class _OrderOfferSheetState extends ConsumerState<_OrderOfferSheet> {
   Timer? _timer;
   late int _secondsLeft;
+  var _submitting = false;
 
   @override
   void initState() {
@@ -65,6 +67,17 @@ class _OrderOfferSheetState extends ConsumerState<_OrderOfferSheet> {
   @override
   Widget build(BuildContext context) {
     final order = widget.offer.order;
+    const capabilities = DriverOrderApiCapabilities();
+    final isOffer = order.status.isEmpty || order.status == 'offered';
+    final canAccept =
+        (order.allowedActions.contains('accept') ||
+            order.allowedActions.isEmpty && isOffer) &&
+        capabilities.supportsAction('accept');
+    final canReject =
+        (order.allowedActions.contains('reject') ||
+            order.allowedActions.isEmpty && isOffer) &&
+        capabilities.supportsAction('reject');
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -84,49 +97,81 @@ class _OrderOfferSheetState extends ConsumerState<_OrderOfferSheet> {
             Text(order.destinationPoint.address),
             const SizedBox(height: 8),
             Text(order.price.formatted),
+            if (order.comment?.isNotEmpty == true) ...[
+              const SizedBox(height: 6),
+              Text(order.comment!),
+            ],
             if (widget.offer.distanceMeters != null)
               Text('${widget.offer.distanceMeters} м до клиента'),
             const SizedBox(height: 8),
             Text('Осталось $_secondsLeft сек.'),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      await ref
-                          .read(currentOrderProvider.notifier)
-                          .accept(order.orderId);
-                      ref.read(orderOfferProvider.notifier).state = null;
-                      if (context.mounted) {
-                        Navigator.of(context).pop();
-                      }
-                    },
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('Принять'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      await ref
-                          .read(currentOrderProvider.notifier)
-                          .reject(order.orderId, 'Too far');
-                      ref.read(orderOfferProvider.notifier).state = null;
-                      if (context.mounted) {
-                        Navigator.of(context).pop();
-                      }
-                    },
-                    icon: const Icon(Icons.cancel_outlined),
-                    label: const Text('Отклонить'),
-                  ),
-                ),
-              ],
-            ),
+            if (canAccept || canReject)
+              Row(
+                children: [
+                  if (canAccept)
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _submitting
+                            ? null
+                            : () => _submit(() async {
+                                await ref
+                                    .read(currentOrderProvider.notifier)
+                                    .accept(order.orderId);
+                                ref.read(orderOfferProvider.notifier).state =
+                                    null;
+                                if (context.mounted) {
+                                  Navigator.of(context).pop();
+                                }
+                              }),
+                        icon: const Icon(Icons.check_circle_outline),
+                        label: const Text('Принять'),
+                      ),
+                    ),
+                  if (canAccept && canReject) const SizedBox(width: 8),
+                  if (canReject)
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _submitting
+                            ? null
+                            : () => _submit(() async {
+                                await ref
+                                    .read(currentOrderProvider.notifier)
+                                    .reject(
+                                      order.orderId,
+                                      'Не могу принять заказ',
+                                    );
+                                ref.read(orderOfferProvider.notifier).state =
+                                    null;
+                                if (context.mounted) {
+                                  Navigator.of(context).pop();
+                                }
+                              }),
+                        icon: const Icon(Icons.cancel_outlined),
+                        label: const Text('Отклонить'),
+                      ),
+                    ),
+                ],
+              )
+            else
+              const Text('Действия по заказу недоступны'),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _submit(Future<void> Function() action) async {
+    if (_submitting) {
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      await action();
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
   }
 }

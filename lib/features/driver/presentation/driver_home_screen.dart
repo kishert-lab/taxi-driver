@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -23,6 +25,7 @@ class DriverHomeScreen extends ConsumerStatefulWidget {
 
 class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   var _index = 0;
+  Timer? _offersPollTimer;
 
   @override
   void initState() {
@@ -30,14 +33,24 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(driverProfileProvider.notifier).load();
       ref.read(realtimeControllerProvider.notifier).start();
+      ref.read(currentOrderProvider.notifier).sync();
+      ref.read(orderOffersSynchronizerProvider).sync();
       ref.read(balanceProvider.notifier).load();
     });
+  }
+
+  @override
+  void dispose() {
+    _stopOffersPolling();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     ref.listen(authControllerProvider, (previous, next) {
       if (next.status == AuthStatus.unauthenticated) {
+        _stopOffersPolling();
+        ref.read(locationControllerProvider.notifier).stop();
         ref.read(realtimeControllerProvider.notifier).stop();
       }
     });
@@ -48,6 +61,16 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
       }
     });
 
+    ref.listen(driverProfileProvider, (previous, next) {
+      final profile = next.value;
+      if (profile == null) {
+        return;
+      }
+      ref
+          .read(driverStatusControllerProvider.notifier)
+          .syncFromProfile(profile);
+    });
+
     ref.listen(driverStatusControllerProvider, (previous, next) {
       final status = next.value;
       if (status == null) {
@@ -55,9 +78,24 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
       }
       if (status.canSendLocation) {
         ref.read(locationControllerProvider.notifier).start(status);
-      } else {
-        ref.read(locationControllerProvider.notifier).stop();
+        _startOffersPolling();
+        return;
       }
+      _stopOffersPolling();
+      ref.read(locationControllerProvider.notifier).stop();
+    });
+
+    ref.listen(currentOrderProvider, (previous, next) {
+      final order = next.value;
+      final previousOrder = previous?.value;
+      if (previousOrder != null && order == null) {
+        ref.read(driverProfileProvider.notifier).refresh();
+      }
+      final locationState = ref.read(locationControllerProvider);
+      if (order?.isInProgress != true || locationState.isTracking) {
+        return;
+      }
+      ref.read(locationControllerProvider.notifier).startTripTracking();
     });
 
     final screens = const [
@@ -81,7 +119,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
           NavigationDestination(
             icon: Icon(Icons.receipt_long_outlined),
             selectedIcon: Icon(Icons.receipt_long),
-            label: 'Заказы',
+            label: 'История',
           ),
           NavigationDestination(
             icon: Icon(Icons.account_balance_wallet_outlined),
@@ -96,5 +134,20 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
         ],
       ),
     );
+  }
+
+  void _startOffersPolling() {
+    if (_offersPollTimer?.isActive == true) {
+      return;
+    }
+    ref.read(orderOffersSynchronizerProvider).sync();
+    _offersPollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      ref.read(orderOffersSynchronizerProvider).sync();
+    });
+  }
+
+  void _stopOffersPolling() {
+    _offersPollTimer?.cancel();
+    _offersPollTimer = null;
   }
 }
