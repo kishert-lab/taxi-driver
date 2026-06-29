@@ -24,6 +24,8 @@ class ApiEndpoints {
   static String driverOrder(String orderId) => '/driver/orders/$orderId';
   static String driverOrderRoute(String orderId) =>
       '/driver/orders/$orderId/route';
+  static String driverOrderRouteBatch(String orderId) =>
+      '/driver/orders/$orderId/route/batch';
   static String driverDispatcherChatMessages(String orderId) =>
       '/driver/orders/$orderId/chat/dispatcher/messages';
 

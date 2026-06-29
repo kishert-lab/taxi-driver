@@ -8,22 +8,31 @@ import '../../features/orders/domain/driver_order.dart';
 class DriverLocationSample {
   const DriverLocationSample({
     required this.coordinates,
+    required this.recordedAt,
     this.heading,
     this.speedMetersPerSecond,
     this.accuracyMeters,
   });
 
   final Coordinates coordinates;
+  final DateTime recordedAt;
   final int? heading;
   final double? speedMetersPerSecond;
   final double? accuracyMeters;
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toOnlineJson() {
     return {
       'location': coordinates.toJson(),
       if (heading != null) 'heading': heading,
       if (speedMetersPerSecond != null) 'speed_mps': speedMetersPerSecond,
       if (accuracyMeters != null) 'accuracy_meters': accuracyMeters,
+    };
+  }
+
+  Map<String, dynamic> toRouteJson() {
+    return {
+      ...toOnlineJson(),
+      'recorded_at': recordedAt.toUtc().toIso8601String(),
     };
   }
 }
@@ -71,6 +80,7 @@ class LocationService {
         latitude: position.latitude,
         longitude: position.longitude,
       ),
+      recordedAt: position.timestamp.toUtc(),
       heading: position.heading < 0
           ? null
           : position.heading.round().clamp(0, 359),

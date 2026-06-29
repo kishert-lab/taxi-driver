@@ -193,7 +193,7 @@ class CurrentOrderController extends StateNotifier<Loadable<DriverOrder>> {
 
   Future<void> complete(DriverOrder order) async {
     await _runOrderAction(() async {
-      await _locationController.sendLastLocationBeforeComplete();
+      await _locationController.sendLastLocationBeforeComplete(order.orderId);
       await _repository.complete(order.orderId, order.price);
       state = const Loadable.idle();
       await _onOrderCompleted();

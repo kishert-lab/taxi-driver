@@ -92,10 +92,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
         ref.read(driverProfileProvider.notifier).refresh();
       }
       final locationState = ref.read(locationControllerProvider);
-      if (order?.isInProgress != true || locationState.isTracking) {
+      if (order?.isInProgress != true ||
+          locationState.activeOrderId == order?.orderId) {
         return;
       }
-      ref.read(locationControllerProvider.notifier).startTripTracking();
+      ref
+          .read(locationControllerProvider.notifier)
+          .startTripTracking(order!.orderId);
     });
 
     final screens = const [

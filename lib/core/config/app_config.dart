@@ -9,13 +9,16 @@ class AppConfig {
   static const development = AppConfig(
     baseUrl: String.fromEnvironment(
       'BASE_URL',
-      defaultValue: 'http://192.168.0.50:8080/api/v1',
+      //defaultValue: 'https://taxi.dev.wkfc.ru/api/v1',
+        defaultValue: 'http://192.168.0.50:8080/api/v1',
     ),
     websocketUrl: String.fromEnvironment(
       'WS_URL',
+      //defaultValue: 'wss://taxi.dev.wkfc.ru/api/v1/ws',
       defaultValue: 'ws://192.168.0.50:8080/api/v1/ws',
     ),
   );
 }
 
 final appConfigProvider = Provider<AppConfig>((ref) => AppConfig.development);
+

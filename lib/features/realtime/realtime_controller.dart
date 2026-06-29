@@ -141,10 +141,7 @@ class RealtimeController extends StateNotifier<RealtimeState>
       case RealtimeEventType.chatMessage:
         final chatMessage = _normalizeChatMessage(message);
         if (chatMessage != null) {
-          _ref.read(chatRealtimeBusProvider).emit(chatMessage);
-          _ref
-              .read(chatThreadsProvider.notifier)
-              .applyIncomingMessage(chatMessage);
+          _dispatchChatMessage(chatMessage);
         }
       case RealtimeEventType.driverLocationUpdated:
         break;
@@ -153,10 +150,7 @@ class RealtimeController extends StateNotifier<RealtimeState>
           final chatMessage = _normalizeChatMessage(message);
           if (chatMessage != null) {
             _log('fallback sync for ws chat event: ${message.event}');
-            _ref.read(chatRealtimeBusProvider).emit(chatMessage);
-            _ref
-                .read(chatThreadsProvider.notifier)
-                .applyIncomingMessage(chatMessage);
+            _dispatchChatMessage(chatMessage);
             return;
           }
         }
@@ -231,6 +225,13 @@ class RealtimeController extends StateNotifier<RealtimeState>
           source['created_at'] ??
           payload['created_at'] ??
           message.occurredAt.toIso8601String(),
+    });
+  }
+
+  void _dispatchChatMessage(ChatMessage chatMessage) {
+    Future<void>(() {
+      _ref.read(chatRealtimeBusProvider).emit(chatMessage);
+      _ref.read(chatThreadsProvider.notifier).applyIncomingMessage(chatMessage);
     });
   }
 

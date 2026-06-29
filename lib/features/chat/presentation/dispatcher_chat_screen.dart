@@ -26,12 +26,48 @@ class DispatcherChatScreen extends ConsumerStatefulWidget {
 class _DispatcherChatScreenState extends ConsumerState<DispatcherChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
+  late final ChatThreadsController _chatThreadsController;
+  late final ProviderSubscription<Loadable<ChatViewData>> _chatSubscription;
   Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
+    _chatThreadsController = ref.read(chatThreadsProvider.notifier);
+    _chatSubscription = ref.listenManual<Loadable<ChatViewData>>(
+      dispatcherChatProvider(widget.orderId),
+      (previous, next) {
+        final previousCount = previous?.value?.messages.length ?? 0;
+        final nextCount = next.value?.messages.length ?? 0;
+        final messages = next.value?.messages;
+        if (messages != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) {
+              return;
+            }
+            _chatThreadsController.applyThreadSnapshot(
+              widget.orderId,
+              messages,
+            );
+            _chatThreadsController.markRead(widget.orderId);
+          });
+        }
+        if (nextCount > previousCount) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) {
+              return;
+            }
+            _scrollToBottom();
+          });
+        }
+      },
+    );
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _chatThreadsController.registerOpenThread(widget.orderId);
       _load();
       _refreshTimer = Timer.periodic(
         const Duration(seconds: 5),
@@ -43,6 +79,10 @@ class _DispatcherChatScreenState extends ConsumerState<DispatcherChatScreen> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _chatSubscription.close();
+    Future<void>(() {
+      _chatThreadsController.unregisterOpenThread(widget.orderId);
+    });
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -54,17 +94,6 @@ class _DispatcherChatScreenState extends ConsumerState<DispatcherChatScreen> {
     final data =
         state.value ??
         const ChatViewData(threadId: '', chatType: '', messages: []);
-
-    ref.listen<Loadable<ChatViewData>>(dispatcherChatProvider(widget.orderId), (
-      previous,
-      next,
-    ) {
-      final previousCount = previous?.value?.messages.length ?? 0;
-      final nextCount = next.value?.messages.length ?? 0;
-      if (nextCount > previousCount) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-      }
-    });
 
     return Scaffold(
       appBar: AppBar(

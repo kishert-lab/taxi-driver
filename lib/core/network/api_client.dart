@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_config.dart';
+import '../session/session_expiration_notifier.dart';
 import '../storage/secure_token_storage.dart';
 import 'api_error.dart';
 import 'auth_interceptor.dart';
@@ -109,6 +110,8 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient(
     config: ref.watch(appConfigProvider),
     tokenStorage: ref.watch(secureTokenStorageProvider),
-    onSessionExpired: () {},
+    onSessionExpired: () {
+      ref.read(sessionExpirationProvider.notifier).markExpired();
+    },
   );
 });

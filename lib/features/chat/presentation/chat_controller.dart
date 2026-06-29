@@ -200,7 +200,6 @@ class DispatcherChatController extends StateNotifier<Loadable<ChatViewData>> {
           ChatViewData(threadId: '', chatType: '', messages: []),
         ),
       ) {
-    _ref.read(chatThreadsProvider.notifier).registerOpenThread(_orderId);
     _subscription = _ref
         .read(chatRealtimeBusProvider)
         .stream
@@ -222,10 +221,6 @@ class DispatcherChatController extends StateNotifier<Loadable<ChatViewData>> {
     try {
       final thread = await _repository.dispatcherMessages(_orderId);
       final mergedMessages = _mergeWithPending(thread.messages);
-      _ref
-          .read(chatThreadsProvider.notifier)
-          .applyThreadSnapshot(_orderId, thread.messages);
-      _ref.read(chatThreadsProvider.notifier).markRead(_orderId);
       state = Loadable.idle(
         ChatViewData(
           threadId: thread.threadId,
@@ -311,8 +306,6 @@ class DispatcherChatController extends StateNotifier<Loadable<ChatViewData>> {
         );
         _queue.removeAt(0);
         _applySentMessage(queued.clientId, message);
-        _ref.read(chatThreadsProvider.notifier).applyIncomingMessage(message);
-        _ref.read(chatThreadsProvider.notifier).markRead(_orderId);
       } on ApiException catch (error) {
         if (_isRetryable(error)) {
           state = Loadable(
@@ -365,8 +358,6 @@ class DispatcherChatController extends StateNotifier<Loadable<ChatViewData>> {
       isSending: _flushInProgress,
     );
     state = Loadable.idle(updated);
-    _ref.read(chatThreadsProvider.notifier).applyIncomingMessage(message);
-    _ref.read(chatThreadsProvider.notifier).markRead(_orderId);
   }
 
   List<ChatMessage> _mergeWithPending(List<ChatMessage> remoteMessages) {
@@ -446,7 +437,6 @@ class DispatcherChatController extends StateNotifier<Loadable<ChatViewData>> {
 
   @override
   void dispose() {
-    _ref.read(chatThreadsProvider.notifier).unregisterOpenThread(_orderId);
     _subscription?.cancel();
     super.dispose();
   }

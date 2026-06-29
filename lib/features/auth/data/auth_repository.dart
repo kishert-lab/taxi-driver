@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/storage/driver_location_outbox_store.dart';
 import '../../../core/storage/secure_token_storage.dart';
 import '../domain/auth_tokens.dart';
 
@@ -14,10 +15,11 @@ abstract class AuthRepository {
 }
 
 class TaxiAuthRepository implements AuthRepository {
-  TaxiAuthRepository(this._apiClient, this._tokenStorage);
+  TaxiAuthRepository(this._apiClient, this._tokenStorage, this._outboxStore);
 
   final ApiClient _apiClient;
   final SecureTokenStorage _tokenStorage;
+  final DriverLocationOutboxStore _outboxStore;
 
   @override
   Future<AuthTokens> login({
@@ -70,11 +72,12 @@ class TaxiAuthRepository implements AuthRepository {
       }
     }
     await _tokenStorage.clear();
+    await _outboxStore.clear();
   }
 
   @override
   Future<void> clearSession() {
-    return _tokenStorage.clear();
+    return Future.wait<void>([_tokenStorage.clear(), _outboxStore.clear()]);
   }
 
   @override
@@ -87,5 +90,6 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return TaxiAuthRepository(
     ref.watch(apiClientProvider),
     ref.watch(secureTokenStorageProvider),
+    ref.watch(driverLocationOutboxStoreProvider),
   );
 });
